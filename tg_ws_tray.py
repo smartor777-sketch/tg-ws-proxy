@@ -51,6 +51,7 @@ _stop_event: Optional[threading.Event] = None
 _async_stop: Optional[object] = None
 _tray_icon: Optional[object] = None
 _config: dict = {}
+_exiting: bool = False
 
 log = logging.getLogger("tg-ws-tray")
 
@@ -198,7 +199,7 @@ def stop_proxy():
         loop, stop_ev = _async_stop
         loop.call_soon_threadsafe(stop_ev.set)
         if _proxy_thread:
-            _proxy_thread.join(timeout=5)
+            _proxy_thread.join(timeout=2)
     _proxy_thread = None
     log.info("Proxy stopped")
 
@@ -401,8 +402,18 @@ def _on_open_logs(icon=None, item=None):
 
 
 def _on_exit(icon=None, item=None):
+    global _exiting
+    if _exiting:
+        os._exit(0)
+        return
+    _exiting = True
     log.info("User requested exit")
-    stop_proxy()
+
+    def _force_exit():
+        time.sleep(3)
+        os._exit(0)
+    threading.Thread(target=_force_exit, daemon=True, name="force-exit").start()
+
     if icon:
         icon.stop()
 
